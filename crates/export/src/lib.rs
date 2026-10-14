@@ -424,11 +424,25 @@ enum AudioWriter {
     Flac(Box<filmcraft_flac::Encoder>),
 }
 
+/// Cleanup guard for temporary staging files: unlinks the temporary file on drop unless disarmed.
+struct TempFileGuard {
+    path: std::path::PathBuf,
+    active: bool,
+}
+
+impl Drop for TempFileGuard {
+    fn drop(&mut self) {
+        if self.active {
+            let _ = std::fs::remove_file(&self.path);
+        }
+    }
+}
+
 /// An export's output file: on disk (staged atomically), or in memory for an [`OutputSink`].
 enum Out {
     File {
         writer: std::io::BufWriter<std::fs::File>,
-        temp_path: std::path::PathBuf,
+        guard: TempFileGuard,
         final_path: std::path::PathBuf,
     },
     Mem(std::io::Cursor<Vec<u8>>),
@@ -454,7 +468,10 @@ impl Out {
         let f = std::fs::File::create(&temp_path).map_err(|e| ExportError::Io(format!("{}: {e}", temp_path.display())))?;
         Ok(Out::File {
             writer: std::io::BufWriter::new(f),
-            temp_path,
+            guard: TempFileGuard {
+                path: temp_path,
+                active: true,
+            },
             final_path,
         })
     }
@@ -466,25 +483,17 @@ impl Out {
 
     fn finish_path(self, settings: &ExportSettings, path: &str) -> Result<u64> {
         match self {
-            Out::File { mut writer, temp_path, final_path } => {
+            Out::File { mut writer, mut guard, final_path } => {
                 writer.flush().map_err(|e| ExportError::Io(e.to_string()))?;
                 drop(writer);
                 // Atomic rename/move to final requested path
-                std::fs::rename(&temp_path, &final_path).map_err(|e| {
-                    let _ = std::fs::remove_file(&temp_path);
+                std::fs::rename(&guard.path, &final_path).map_err(|e| {
                     ExportError::Io(format!("failed to finalize export to {}: {e}", final_path.display()))
                 })?;
+                guard.active = false;
                 Ok(std::fs::metadata(&final_path).map(|m| m.len()).unwrap_or(0))
             }
             Out::Mem(c) => write_output(settings, path, c.into_inner()),
-        }
-    }
-}
-
-impl Drop for Out {
-    fn drop(&mut self) {
-        if let Out::File { temp_path, .. } = self {
-            let _ = std::fs::remove_file(temp_path);
         }
     }
 }

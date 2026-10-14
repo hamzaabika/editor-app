@@ -1,4 +1,4 @@
-name: CI
+name: Linux Build (.deb)
 
 on:
   push:
@@ -15,15 +15,15 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  ci:
-    name: Ubuntu Linux CI (Gates, Tests, Build)
+  build-deb:
+    name: Build Linux .deb Package
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install Linux build dependencies
+      - name: Install Linux build dependencies & nfpm
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
@@ -38,35 +38,25 @@ jobs:
             libwayland-dev \
             libvulkan-dev \
             libgtk-3-dev \
-            desktop-file-validate \
+            desktop-file-utils \
             appstream
+          curl -LO https://github.com/goreleaser/nfpm/releases/download/v2.41.3/nfpm_2.41.3_amd64.deb
+          sudo dpkg -i nfpm_2.41.3_amd64.deb
+          rm -f nfpm_2.41.3_amd64.deb
 
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
-          targets: wasm32-unknown-unknown
 
       - name: Setup Rust Cache
         uses: Swatinem/rust-cache@v2
 
-      - name: Format Check (cargo fmt)
-        run: cargo fmt --check
+      - name: Build & Package .deb
+        run: |
+          bash packaging/linux/package.sh --formats "deb"
 
-      - name: Architecture Layering (xtask layers)
-        run: cargo run -p xtask -- layers
-
-      - name: Asset Attributions (xtask assets)
-        run: cargo run -p xtask -- assets
-
-      - name: Clippy Lints
-        run: cargo clippy --workspace --all-targets -- -D warnings
-
-      - name: Workspace Tests
-        run: cargo test --workspace
-
-      - name: WASM Check (xtask wasm)
-        run: cargo run -p xtask -- wasm
-
-      - name: Build FilmCraft Release Binaries
-        run: cargo build --release -p filmcraft -p filmcraft-cli
+      - name: Upload .deb Package Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: filmcraft-linux-deb
+          path: dist/release/*.deb
+          if-no-files-found: error

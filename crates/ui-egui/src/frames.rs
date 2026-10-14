@@ -490,8 +490,48 @@ impl FrameServer {
         })
     }
 
+    /// Retrieve a frame matching target, frame number and revision, even if at a different scale/resolution.
+    pub fn get_any_scale(&self, k: &FrameKey) -> Option<(FrameKey, Arc<Rgba>)> {
+        let mut c = self.shared.done.lock().unwrap_or_else(|e| e.into_inner());
+        if let Some((v, s)) = c.map.get_mut(k) {
+            c.clock += 1;
+            *s = c.clock;
+            return Some((*k, v.clone()));
+        }
+        let candidate = c.map.iter().find_map(|(key, (v, _))| {
+            if key.target == k.target && key.frame == k.frame && key.revision == k.revision {
+                Some((*key, v.clone()))
+            } else {
+                None
+            }
+        });
+        if let Some((found_key, v)) = candidate {
+            c.clock += 1;
+            if let Some((_, s)) = c.map.get_mut(&found_key) {
+                *s = c.clock;
+            }
+            return Some((found_key, v));
+        }
+        None
+    }
+
     pub fn get_plan(&self, k: &FrameKey) -> Option<Arc<GpuPlan>> {
         self.shared.plans.lock().unwrap_or_else(|e| e.into_inner()).get(k)
+    }
+
+    /// Retrieve a GPU plan matching target, frame number and revision, even if at a different scale/resolution.
+    pub fn get_plan_any_scale(&self, k: &FrameKey) -> Option<(FrameKey, Arc<GpuPlan>)> {
+        let mut g = self.shared.plans.lock().unwrap_or_else(|e| e.into_inner());
+        if let Some(p) = g.get(k) {
+            return Some((*k, p));
+        }
+        g.map.iter().find_map(|(key, (p, _))| {
+            if key.target == k.target && key.frame == k.frame && key.revision == k.revision {
+                Some((*key, p.clone()))
+            } else {
+                None
+            }
+        })
     }
 
     /// Whether the exact frame (image or plan) is ready.

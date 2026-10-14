@@ -3045,8 +3045,37 @@ fn interact(app: &mut FilmcraftApp, ui: &mut egui::Ui, seq: &Sequence, layout: &
                 params["video"] = json!(source.video);
                 params["audio"] = json!(source.audio);
             }
-            if let Err(e) = app.session.execute("timeline.place", params) {
-                app.ui.status = e.to_string();
+            let clip_media = app.session.project.item(item).and_then(|i| i.as_media());
+            let clip_video = clip_media.and_then(|m| m.info.video.as_ref());
+            let (clip_w, clip_h, clip_fps) = clip_video.map(|v| (v.width, v.height, v.frame_rate)).unwrap_or((0, 0, rate));
+            let seq_w = seq.settings.width;
+            let seq_h = seq.settings.height;
+            let seq_fps = seq.settings.frame_rate;
+            let mismatch = clip_w > 0 && clip_h > 0 && (clip_w != seq_w || clip_h != seq_h || (clip_fps != seq_fps && clip_fps.as_f64() > 0.0));
+            if app.session.prefs.timeline.clip_mismatch_warning && mismatch {
+                let clip_name = app.session.project.item(item).map(|i| i.name.clone()).unwrap_or_else(|| "Clip".into());
+                app.ui.mismatch_dialog = Some(crate::state::SequenceMismatchDraft {
+                    params,
+                    clip_name,
+                    clip_width: clip_w,
+                    clip_height: clip_h,
+                    clip_fps_num: clip_fps.numerator(),
+                    clip_fps_den: clip_fps.denominator(),
+                    seq_width: seq_w,
+                    seq_height: seq_h,
+                    seq_fps_num: seq_fps.numerator(),
+                    seq_fps_den: seq_fps.denominator(),
+                    custom_preset: 0,
+                    custom_width: clip_w,
+                    custom_height: clip_h,
+                    custom_fps_idx: 4,
+                    show_custom: false,
+                    dont_ask_again: false,
+                });
+            } else {
+                if let Err(e) = app.session.execute("timeline.place", params) {
+                    app.ui.status = e.to_string();
+                }
             }
             crate::panels::clear_drag(ui);
         }
@@ -3146,9 +3175,38 @@ fn interact(app: &mut FilmcraftApp, ui: &mut egui::Ui, seq: &Sequence, layout: &
             let start = snap(app, seq, layout, rate.snap_nearest(layout.tick_at(p.x).max(Tick::ZERO)), &[]);
             // one command, one undo step: the files go end to end from the drop point
             let ids: Vec<u64> = items.iter().map(|i| i.0).collect();
-            let params = json!({"items": ids, "track": vt, "audioTrack": at, "time": start.0, "insert": false});
-            if let Err(e) = app.session.execute("timeline.place", params) {
-                app.ui.status = e.to_string();
+            let first_item = items.first().copied();
+            let clip_media = first_item.and_then(|i| app.session.project.item(i)).and_then(|i| i.as_media());
+            let clip_video = clip_media.and_then(|m| m.info.video.as_ref());
+            let (clip_w, clip_h, clip_fps) = clip_video.map(|v| (v.width, v.height, v.frame_rate)).unwrap_or((0, 0, rate));
+            let seq_w = seq.settings.width;
+            let seq_h = seq.settings.height;
+            let seq_fps = seq.settings.frame_rate;
+            let mismatch = clip_w > 0 && clip_h > 0 && (clip_w != seq_w || clip_h != seq_h || (clip_fps != seq_fps && clip_fps.as_f64() > 0.0));
+            if app.session.prefs.timeline.clip_mismatch_warning && mismatch {
+                let clip_name = first_item.and_then(|i| app.session.project.item(i)).map(|i| i.name.clone()).unwrap_or_else(|| "Clip".into());
+                app.ui.mismatch_dialog = Some(crate::state::SequenceMismatchDraft {
+                    params,
+                    clip_name,
+                    clip_width: clip_w,
+                    clip_height: clip_h,
+                    clip_fps_num: clip_fps.numerator(),
+                    clip_fps_den: clip_fps.denominator(),
+                    seq_width: seq_w,
+                    seq_height: seq_h,
+                    seq_fps_num: seq_fps.numerator(),
+                    seq_fps_den: seq_fps.denominator(),
+                    custom_preset: 0,
+                    custom_width: clip_w,
+                    custom_height: clip_h,
+                    custom_fps_idx: 4,
+                    show_custom: false,
+                    dont_ask_again: false,
+                });
+            } else {
+                if let Err(e) = app.session.execute("timeline.place", params) {
+                    app.ui.status = e.to_string();
+                }
             }
         }
     }

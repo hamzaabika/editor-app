@@ -207,6 +207,9 @@ pub fn item_interactions(
         }
         app.ui.project_panel.selected_bin = None;
         actions.push(("project.select".into(), json!({"items": sel.iter().map(|i| i.0).collect::<Vec<_>>()})));
+        if app.session.state.source_item.is_none() && matches!(kind, ItemKind::Media(_)) {
+            actions.push(("source.open".into(), json!({"item": id.0})));
+        }
     }
     if resp.double_clicked() {
         let matte = matches!(kind, ItemKind::Media(m) if matches!(m.media, filmcraft_engine::project::MediaRef::Generator(filmcraft_media::Generator::ColorMatte { .. })));

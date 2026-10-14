@@ -25,6 +25,7 @@ pub mod menu_dialogs;
 pub mod metadata;
 pub mod meters;
 pub mod misc;
+pub mod mismatch_dialog;
 pub mod mixer;
 pub mod monitor;
 pub mod monitor_view;

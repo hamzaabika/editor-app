@@ -1417,6 +1417,17 @@ fn build() -> Vec<CommandSpec> {
             if ids.is_empty() && sequences.is_empty() && reports.is_empty() && !errors.is_empty() {
                 return Err(EngineError::Other(errors.join("; ")));
             }
+            if !ids.is_empty() {
+                if s.state.source_item.is_none() {
+                    let first_id = ItemId(ids[0]);
+                    s.state.source_item = Some(first_id);
+                    s.state.source_playhead = crate::clip_ops::source_view(s, first_id).map(|v| v.start).unwrap_or_default();
+                    s.events.push(crate::Event::OpenSource(first_id));
+                }
+                if s.state.project_selection.is_empty() {
+                    s.state.project_selection = vec![ItemId(ids[0])];
+                }
+            }
             // Project Settings ▸ Ingest: copy / transcode / create proxies
             // (image sequences are many files: ingest copies and transcodes single files only)
             let item_ids: Vec<ItemId> = ids.iter().filter(|i| !image_sequences.iter().any(|q| q["item"].as_u64() == Some(**i))).map(|i| ItemId(*i)).collect();

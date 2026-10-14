@@ -222,14 +222,9 @@ fn app_creator(launch: Launch, graphics: graphics::GraphicsStart, created: Arc<A
         } else if !startup_flag && session.prefs.general.at_startup == "openMostRecent" {
             // Settings ▸ General ▸ At Startup ▸ Open Most Recent
             let recent = session.prefs.general.recent_projects.iter().find(|p| std::path::Path::new(p).exists()).cloned();
-            match recent {
-                Some(p) => {
-                    if let Err(e) = session.execute("file.open", json!({"path": p})) {
-                        log::error!("{e}");
-                    }
-                }
-                None => {
-                    let _ = session.execute("file.openDemoProject", json!({}));
+            if let Some(p) = recent {
+                if let Err(e) = session.execute("file.open", json!({"path": p})) {
+                    log::error!("{e}");
                 }
             }
         } else if !startup_flag && session.prefs.general.at_startup == "emptyProject" {
@@ -247,6 +242,9 @@ fn app_creator(launch: Launch, graphics: graphics::GraphicsStart, created: Arc<A
             }
         }
         let mut app = FilmcraftApp::new(session);
+        if !startup_flag && project_file.is_none() && media.is_empty() && app.session.prefs.general.at_startup == "showHome" {
+            app.ui.mode = filmcraft_ui_egui::state::Mode::Import;
+        }
         app.graphics_notice = notice;
         if recover == Some(false) {
             app.dialog = None;

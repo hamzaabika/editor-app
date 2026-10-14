@@ -59,8 +59,22 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect, which: Which)
             )
         }
         Which::Source => {
-            let Some(item) = app.session.state.source_item else {
-                crate::dock::placeholder(ui, rect, &t, tl!("(no clips)"));
+            if let Some(dragged) = crate::panels::dragged_project_item(ui) {
+                if rect.contains(ctx.pointer_hover_pos().unwrap_or_default()) {
+                    ui.painter().rect_stroke(rect, 4.0, egui::Stroke::new(2.0, t.accent), egui::StrokeKind::Inside);
+                    if ctx.input(|i| i.pointer.any_released()) {
+                        let _ = app.session.execute("source.open", json!({"item": dragged.0}));
+                        crate::panels::clear_drag(ui);
+                    }
+                }
+            }
+            let item = app.session.state.source_item.or_else(|| {
+                app.session.state.project_selection.first().copied().filter(|id| {
+                    app.session.project.item(*id).is_some_and(|i| matches!(i.kind, ItemKind::Media(_) | ItemKind::Sequence(_)))
+                })
+            });
+            let Some(item) = item else {
+                render_source_placeholder(app, ui, rect, &t, &ctx);
                 return;
             };
             let Some(pi) = app.session.project.item(item) else { return };
@@ -213,6 +227,7 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect, which: Which)
                 .frames
                 .get_plan(&key)
                 .map(|p| (key, p))
+                .or_else(|| app.frames.get_plan_any_scale(&key))
                 .or_else(|| app.frames.nearest_plan(key, 6))
                 .or_else(|| asked.iter().find_map(|k| app.frames.get_plan(k).map(|p| (*k, p))));
             match found {
@@ -490,7 +505,9 @@ fn cpu_texture(
         .frames
         .get(&key)
         .map(|img| (key, img))
+        .or_else(|| app.frames.get_any_scale(&key))
         .or_else(|| (1..=6).map(|d| FrameKey { frame: key.frame.saturating_sub(d), ..key }).find_map(|k| app.frames.get(&k).map(|img| (k, img))))
+        .or_else(|| (1..=6).map(|d| FrameKey { frame: key.frame.saturating_sub(d), ..key }).find_map(|k| app.frames.get_any_scale(&k)))
         .or_else(|| asked.iter().find_map(|k| app.frames.get(k).map(|img| (*k, img))));
     match found {
         Some((k, img)) => {
@@ -602,6 +619,23 @@ pub fn quantize_scale(s: f32) -> f32 {
     // Buckets keep the cache effective while resizing the panel.
     let buckets = [1.0 / 32.0, 1.0 / 16.0, 1.0 / 8.0, 0.1875, 0.25, 0.375, 0.5, 0.75, 1.0];
     *buckets.iter().find(|b| **b >= s - 1e-4).unwrap_or(&1.0)
+}
+
+pub fn render_source_placeholder(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect, t: &Tokens, ctx: &egui::Context) {
+    ui.painter().rect_filled(rect, t.radius, t.panel_bg);
+    let center = rect.center();
+    let icon_rect = Rect::from_center_size(center - vec2(0.0, 36.0), vec2(48.0, 48.0));
+    icons::paint(ui.painter(), icon_rect, Icon::Film, t.text_dim);
+    ui.painter().text(center - vec2(0.0, 2.0), Align2::CENTER_CENTER, tl!("No Clip Loaded in Source Monitor"), Tokens::semibold(14.0), t.text);
+    ui.painter().text(center + vec2(0.0, 22.0), Align2::CENTER_CENTER, tl!("Double-click a clip in the Project panel or drag media here"), Tokens::ui(12.0), t.text_dim);
+    let btn_rect = Rect::from_center_size(center + vec2(0.0, 58.0), vec2(140.0, 28.0));
+    let resp = ui.interact(btn_rect, egui::Id::new("source-import-btn"), Sense::click());
+    let (bg, fg) = if resp.hovered() { (t.accent_hover, Color32::WHITE) } else { (t.accent, Color32::WHITE) };
+    ui.painter().rect_filled(btn_rect, 4.0, bg);
+    ui.painter().text(btn_rect.center(), Align2::CENTER_CENTER, tl!("Import Media…"), Tokens::semibold(12.5), fg);
+    if resp.clicked() {
+        let _ = crate::menus::invoke(app, ctx, "file.import", json!({}));
+    }
 }
 
 pub fn fit(area: Rect, w: f32, h: f32) -> Rect {

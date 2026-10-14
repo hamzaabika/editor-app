@@ -587,6 +587,9 @@ pub struct UiState {
     /// open when Some). See `panels::clip_dialogs`.
     #[serde(default)]
     pub clip_dialog: Option<ClipDialogDraft>,
+    /// Sequence mismatch warning dialog: open when a placed clip does not match sequence settings.
+    #[serde(default)]
+    pub mismatch_dialog: Option<SequenceMismatchDraft>,
     /// M3.11 menu items: their dialog, Dynamic Audio Waveforms, the Media Browser selection. See
     /// `panels::menu_dialogs`.
     #[serde(default)]
@@ -623,6 +626,51 @@ pub struct ClipDialogDraft {
     pub info: serde_json::Value,
     #[serde(default)]
     pub error: String,
+}
+
+/// The Sequence Mismatch dialog shown when placing a clip whose resolution or frame rate does not match the sequence.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct SequenceMismatchDraft {
+    pub params: serde_json::Value,
+    pub clip_name: String,
+    pub clip_width: u32,
+    pub clip_height: u32,
+    pub clip_fps_num: i64,
+    pub clip_fps_den: i64,
+    pub seq_width: u32,
+    pub seq_height: u32,
+    pub seq_fps_num: i64,
+    pub seq_fps_den: i64,
+    pub custom_preset: usize,
+    pub custom_width: u32,
+    pub custom_height: u32,
+    pub custom_fps_idx: usize,
+    pub show_custom: bool,
+    pub dont_ask_again: bool,
+}
+
+impl Default for SequenceMismatchDraft {
+    fn default() -> Self {
+        Self {
+            params: serde_json::Value::Null,
+            clip_name: String::new(),
+            clip_width: 1920,
+            clip_height: 1080,
+            clip_fps_num: 24_000,
+            clip_fps_den: 1001,
+            seq_width: 1920,
+            seq_height: 1080,
+            seq_fps_num: 24_000,
+            seq_fps_den: 1001,
+            custom_preset: 0,
+            custom_width: 1920,
+            custom_height: 1080,
+            custom_fps_idx: 4,
+            show_custom: false,
+            dont_ask_again: false,
+        }
+    }
 }
 
 /// A pen mask in progress: vertices placed so far, in clip pixels (`[x, y, tangent x, tangent y]`).
@@ -1019,6 +1067,7 @@ impl Default for UiState {
             text_props_dialog: None,
             workspace_dialog: None,
             clip_dialog: None,
+            mismatch_dialog: None,
             extras: Default::default(),
             gfx_templates: Default::default(),
             panels: Default::default(),

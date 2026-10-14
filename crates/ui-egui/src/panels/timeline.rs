@@ -3059,12 +3059,12 @@ fn interact(app: &mut FilmcraftApp, ui: &mut egui::Ui, seq: &Sequence, layout: &
                     clip_name,
                     clip_width: clip_w,
                     clip_height: clip_h,
-                    clip_fps_num: clip_fps.numerator(),
-                    clip_fps_den: clip_fps.denominator(),
+                    clip_fps_num: clip_fps.num,
+                    clip_fps_den: clip_fps.den,
                     seq_width: seq_w,
                     seq_height: seq_h,
-                    seq_fps_num: seq_fps.numerator(),
-                    seq_fps_den: seq_fps.denominator(),
+                    seq_fps_num: seq_fps.num,
+                    seq_fps_den: seq_fps.den,
                     custom_preset: 0,
                     custom_width: clip_w,
                     custom_height: clip_h,
@@ -3175,6 +3175,7 @@ fn interact(app: &mut FilmcraftApp, ui: &mut egui::Ui, seq: &Sequence, layout: &
             let start = snap(app, seq, layout, rate.snap_nearest(layout.tick_at(p.x).max(Tick::ZERO)), &[]);
             // one command, one undo step: the files go end to end from the drop point
             let ids: Vec<u64> = items.iter().map(|i| i.0).collect();
+            let params = json!({"items": ids, "track": vt, "audioTrack": at, "time": start.0, "insert": false});
             let first_item = items.first().copied();
             let clip_media = first_item.and_then(|i| app.session.project.item(i)).and_then(|i| i.as_media());
             let clip_video = clip_media.and_then(|m| m.info.video.as_ref());
@@ -3190,12 +3191,12 @@ fn interact(app: &mut FilmcraftApp, ui: &mut egui::Ui, seq: &Sequence, layout: &
                     clip_name,
                     clip_width: clip_w,
                     clip_height: clip_h,
-                    clip_fps_num: clip_fps.numerator(),
-                    clip_fps_den: clip_fps.denominator(),
+                    clip_fps_num: clip_fps.num,
+                    clip_fps_den: clip_fps.den,
                     seq_width: seq_w,
                     seq_height: seq_h,
-                    seq_fps_num: seq_fps.numerator(),
-                    seq_fps_den: seq_fps.denominator(),
+                    seq_fps_num: seq_fps.num,
+                    seq_fps_den: seq_fps.den,
                     custom_preset: 0,
                     custom_width: clip_w,
                     custom_height: clip_h,

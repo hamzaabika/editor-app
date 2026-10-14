@@ -82,7 +82,7 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
     crate::icons::paint(
         ui.painter(),
         Rect::from_center_size(pos2(new_btn_r.min.x + 20.0, new_btn_r.center().y), vec2(16.0, 16.0)),
-        crate::icons::Icon::Add,
+        crate::icons::Icon::Plus,
         Color32::WHITE,
     );
     ui.painter().text(pos2(new_btn_r.min.x + 38.0, new_btn_r.center().y), Align2::LEFT_CENTER, tl!("New Project"), Tokens::semibold(13.5), Color32::WHITE);
@@ -187,13 +187,7 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
                     ui.label(egui::RichText::new(tl!("Location:")).size(13.0));
                     ui.add(egui::TextEdit::singleline(&mut modal.location).desired_width(260.0));
                     if ui.button(tl!("Browse…")).clicked() {
-                        app.pick_ui(crate::panels::file_dialogs::FileDialog::Folder { at: None }, |_, paths| {
-                            if let Some(folder) = paths.into_iter().next() {
-                                if let Ok(mut m) = std::sync::Mutex::new(()).lock() {
-                                    let _ = m;
-                                }
-                            }
-                        });
+                        app.pick_ui(crate::FileDialog::Folder { at: None }, |_, _| {});
                     }
                 });
 

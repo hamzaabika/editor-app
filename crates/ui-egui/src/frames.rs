@@ -493,9 +493,10 @@ impl FrameServer {
     /// Retrieve a frame matching target, frame number and revision, even if at a different scale/resolution.
     pub fn get_any_scale(&self, k: &FrameKey) -> Option<(FrameKey, Arc<Rgba>)> {
         let mut c = self.shared.done.lock().unwrap_or_else(|e| e.into_inner());
+        c.clock += 1;
+        let clock = c.clock;
         if let Some((v, s)) = c.map.get_mut(k) {
-            c.clock += 1;
-            *s = c.clock;
+            *s = clock;
             return Some((*k, v.clone()));
         }
         let candidate = c.map.iter().find_map(|(key, (v, _))| {
@@ -506,9 +507,8 @@ impl FrameServer {
             }
         });
         if let Some((found_key, v)) = candidate {
-            c.clock += 1;
             if let Some((_, s)) = c.map.get_mut(&found_key) {
-                *s = c.clock;
+                *s = clock;
             }
             return Some((found_key, v));
         }
@@ -525,7 +525,7 @@ impl FrameServer {
         if let Some(p) = g.get(k) {
             return Some((*k, p));
         }
-        g.map.iter().find_map(|(key, (p, _))| {
+        g.map.iter().find_map(|(key, (p, _, _))| {
             if key.target == k.target && key.frame == k.frame && key.revision == k.revision {
                 Some((*key, p.clone()))
             } else {

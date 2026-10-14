@@ -6,11 +6,10 @@
 //! 2. "Change Sequence to Match Clip"
 //! 3. "Create Custom Sequence" (presets: 16:9, 9:16 vertical, 1:1, 4:5, 4K, custom)
 
-use egui::{Align2, Color32, Rect, Stroke, vec2};
+use egui::{Align2, Color32, Rect, vec2};
 use serde_json::json;
 
 use crate::FilmcraftApp;
-use crate::theme::Tokens;
 
 const PRESETS: &[(&str, u32, u32)] = &[
     ("1920 × 1080 — 16:9 Landscape (Full HD)", 1920, 1080),
@@ -69,18 +68,12 @@ pub fn show(app: &mut FilmcraftApp, ctx: &egui::Context) {
             ui.add_space(14.0);
 
             // Comparison Card
-            let card_rect = ui.available_rect_before_wrap();
-            let card_h = 76.0;
-            let card_r = Rect::from_min_size(card_rect.min, vec2(card_rect.width(), card_h));
-            ui.painter().rect_filled(card_r, 6.0, t.tl_header_bg);
-            ui.painter().rect_stroke(card_r, 6.0, Stroke::new(1.0, t.separator), egui::StrokeKind::Inside);
-
             let clip_fps_f = draft.clip_fps_num as f64 / draft.clip_fps_den.max(1) as f64;
             let seq_fps_f = draft.seq_fps_num as f64 / draft.seq_fps_den.max(1) as f64;
             let clip_aspect = aspect_str(draft.clip_width, draft.clip_height);
             let seq_aspect = aspect_str(draft.seq_width, draft.seq_height);
 
-            ui.allocate_ui_at_rect(card_r.shrink(10.0), |ui| {
+            ui.group(|ui| {
                 ui.horizontal(|ui| {
                     let half = (ui.available_width() - 16.0) / 2.0;
                     ui.allocate_ui_with_layout(vec2(half, 56.0), egui::Layout::top_down(egui::Align::Min), |ui| {
@@ -97,7 +90,7 @@ pub fn show(app: &mut FilmcraftApp, ctx: &egui::Context) {
                 });
             });
 
-            ui.add_space(card_h + 16.0);
+            ui.add_space(12.0);
 
             // Primary choices: Keep vs Match
             ui.vertical(|ui| {

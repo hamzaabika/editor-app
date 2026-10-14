@@ -1450,28 +1450,28 @@ fn draw_headers(app: &mut FilmcraftApp, ui: &mut egui::Ui, seq: &Sequence, rows:
             ui.set_min_width(170.0);
             if ui.button("Rename Track…").clicked() {
                 app.ui.timeline.rename_track = Some((track_id, track_name));
-                ui.close_menu();
+                ui.close();
             }
             if ui.button("Duplicate Track").clicked() {
                 actions.push(("sequence.duplicateTrack".into(), json!({"track": track_id.0})));
-                ui.close_menu();
+                ui.close();
             }
             if ui.button("Add Tracks…").clicked() {
                 actions.push(("sequence.addTracks".into(), json!({})));
-                ui.close_menu();
+                ui.close();
             }
             if ui.button("Delete Track").clicked() {
                 actions.push(("sequence.deleteTrack".into(), json!({"track": track_id.0})));
-                ui.close_menu();
+                ui.close();
             }
             ui.separator();
             if ui.button(if is_locked { "Unlock Track" } else { "Lock Track" }).clicked() {
                 actions.push(("timeline.setTrack".into(), json!({"track": track_id.0, "locked": !is_locked})));
-                ui.close_menu();
+                ui.close();
             }
             if ui.button(if is_sync { "Disable Sync Lock" } else { "Enable Sync Lock" }).clicked() {
                 actions.push(("timeline.setTrack".into(), json!({"track": track_id.0, "syncLock": !is_sync})));
-                ui.close_menu();
+                ui.close();
             }
         });
     }

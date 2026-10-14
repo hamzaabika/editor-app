@@ -242,7 +242,7 @@ fn app_creator(launch: Launch, graphics: graphics::GraphicsStart, created: Arc<A
             }
         }
         let mut app = FilmcraftApp::new(session);
-        if !startup_flag && project_file.is_none() && media.is_empty() && app.session.prefs.general.at_startup == "showHome" {
+        if !startup_flag && project.is_none() && media.is_empty() && app.session.prefs.general.at_startup == "showHome" {
             app.ui.mode = filmcraft_ui_egui::state::Mode::Import;
         }
         app.graphics_notice = notice;

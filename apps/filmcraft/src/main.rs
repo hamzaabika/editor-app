@@ -215,6 +215,7 @@ fn app_creator(launch: Launch, graphics: graphics::GraphicsStart, created: Arc<A
         // voice-over recording reads the microphone through cpal
         session.voiceover.input = Some(Box::new(audio_in::CpalIn::new(&session.prefs.audio_hardware.device_class)));
         let (project, media) = args::project_and_media(&files);
+        let has_project = project.is_some();
         if let Some(p) = project {
             if let Err(e) = session.execute("file.open", json!({"path": p})) {
                 log::error!("{e}");
@@ -242,7 +243,7 @@ fn app_creator(launch: Launch, graphics: graphics::GraphicsStart, created: Arc<A
             }
         }
         let mut app = FilmcraftApp::new(session);
-        if !startup_flag && project.is_none() && media.is_empty() && app.session.prefs.general.at_startup == "showHome" {
+        if !startup_flag && !has_project && media.is_empty() && app.session.prefs.general.at_startup == "showHome" {
             app.ui.mode = filmcraft_ui_egui::state::Mode::Import;
         }
         app.graphics_notice = notice;

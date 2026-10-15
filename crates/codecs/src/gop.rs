@@ -207,7 +207,7 @@ impl State {
         self.frames
             .iter()
             .filter(|(p, _)| draft_ok || !self.drafts.contains(p))
-            .min_by_key(|(p, _)| (p - pts).abs())
+            .min_by_key(|(p, _)| (*p - pts).abs())
             .map(|(_, f)| f.clone())
     }
 }

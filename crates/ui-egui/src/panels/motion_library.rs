@@ -21,6 +21,8 @@ use crate::icons::{self, Icon};
 use crate::theme::Tokens;
 use crate::FilmcraftApp;
 
+const CYAN: Color32 = Color32::from_rgb(0x38, 0xbd, 0xf8);
+
 // ------------------------------------------------------------------------------------------------
 // Data Models & Presets
 // ------------------------------------------------------------------------------------------------
@@ -560,12 +562,10 @@ fn target_clip(app: &FilmcraftApp) -> Option<(ClipId, TrackItem)> {
     }
     // 2. Try the top video clip under the playhead
     let playhead = app.session.playhead();
-    for track in seq.tracks.iter().rev() {
-        if track.kind == TrackKind::Video {
-            for it in &track.items {
-                if it.start <= playhead && playhead < it.start + it.duration {
-                    return Some((it.id, it.clone()));
-                }
+    for track in seq.video_tracks.iter().rev() {
+        for it in &track.items {
+            if it.start <= playhead && playhead < it.start + it.duration {
+                return Some((it.id, it.clone()));
             }
         }
     }
@@ -740,7 +740,7 @@ fn apply_motion_preset(
                         json!({ "clips": [clip_id.0], "effect": "gaussian_blur" }),
                     );
                     // Shutter keyframes
-                    let step = t_in / 4;
+                    let step = Tick(t_in.0 / 4);
                     let _ = app.session.execute(
                         "effects.setParam",
                         json!({
@@ -1021,7 +1021,7 @@ fn draw_animated_thumbnail(
             // Seam line
             painter.line_segment(
                 [pos2(split_x, rect.min.y), pos2(split_x, rect.max.y)],
-                Stroke::new(2.0, tokens.cyan),
+                Stroke::new(2.0, CYAN),
             );
 
             // Center transition indicator
@@ -1052,7 +1052,7 @@ fn draw_animated_thumbnail(
                 painter.rect_filled(
                     Rect::from_min_size(bar_rect.min, vec2(3.0, 18.0)),
                     1.5,
-                    tokens.cyan,
+                    CYAN,
                 );
                 painter.text(
                     pos2(bar_rect.min.x + 8.0, bar_rect.center().y),
@@ -1083,7 +1083,7 @@ fn draw_animated_thumbnail(
         PresetCategory::GraphicComponents => {
             // Animated graphic reticle / badge
             let pulse_r = 14.0 + (time * 6.0).sin().abs() * 6.0;
-            painter.circle_stroke(center, pulse_r, Stroke::new(1.5, tokens.cyan));
+            painter.circle_stroke(center, pulse_r, Stroke::new(1.5, CYAN));
             painter.circle_filled(center, 4.0, tokens.accent);
 
             // Crosshairs
@@ -1098,7 +1098,7 @@ fn draw_animated_thumbnail(
             painter.rect_stroke(grad_rect, 4.0, Stroke::new(1.5, tokens.accent), StrokeKind::Inside);
 
             let fx_icon = Rect::from_center_size(center, vec2(18.0, 18.0));
-            icons::paint(painter, fx_icon, Icon::Fx, tokens.cyan);
+            icons::paint(painter, fx_icon, Icon::Fx, CYAN);
         }
 
         PresetCategory::SoundFx => {
@@ -1114,12 +1114,12 @@ fn draw_animated_thumbnail(
                 let phase = time * 8.0 + i as f32 * 0.7;
                 let h = 8.0 + (phase.sin().abs() * 24.0);
                 let bar_rect = Rect::from_center_size(pos2(x, center.y), vec2(bar_w, h));
-                painter.rect_filled(bar_rect, 1.5, if i % 2 == 0 { tokens.accent } else { tokens.cyan });
+                painter.rect_filled(bar_rect, 1.5, if i % 2 == 0 { tokens.accent } else { CYAN });
             }
         }
 
         PresetCategory::Favorites => {
-            icons::paint(painter, Rect::from_center_size(center, vec2(20.0, 20.0)), Icon::Marker, tokens.cyan);
+            icons::paint(painter, Rect::from_center_size(center, vec2(20.0, 20.0)), Icon::Marker, CYAN);
         }
     }
 }
@@ -1154,9 +1154,9 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
 
     // Active tab indicators
     if is_browse {
-        ui.painter().line_segment([pos2(tab_browse_rect.min.x + 4.0, head.max.y - 1.5), pos2(tab_browse_rect.max.x - 4.0, head.max.y - 1.5)], Stroke::new(2.5, t.cyan));
+        ui.painter().line_segment([pos2(tab_browse_rect.min.x + 4.0, head.max.y - 1.5), pos2(tab_browse_rect.max.x - 4.0, head.max.y - 1.5)], Stroke::new(2.5, CYAN));
     } else {
-        ui.painter().line_segment([pos2(tab_edit_rect.min.x + 4.0, head.max.y - 1.5), pos2(tab_edit_rect.max.x - 4.0, head.max.y - 1.5)], Stroke::new(2.5, t.cyan));
+        ui.painter().line_segment([pos2(tab_edit_rect.min.x + 4.0, head.max.y - 1.5), pos2(tab_edit_rect.max.x - 4.0, head.max.y - 1.5)], Stroke::new(2.5, CYAN));
     }
 
     ui.painter().text(tab_browse_rect.center(), Align2::CENTER_CENTER, "Browse", Tokens::semibold(12.5), if is_browse { t.text } else { t.text_dim });
@@ -1208,7 +1208,7 @@ fn render_browse_tab(
     current_time: f32,
 ) {
     let t = app.tokens;
-    let sidebar_w = 220.0.min(rect.width() * 0.4).max(170.0);
+    let sidebar_w: f32 = (220.0f32).min(rect.width() * 0.4).max(170.0);
     let sidebar_rect = Rect::from_min_max(rect.min, pos2(rect.min.x + sidebar_w, rect.max.y));
     let divider_x = sidebar_rect.max.x;
     let grid_rect = Rect::from_min_max(pos2(divider_x + 1.0, rect.min.y), rect.max);
@@ -1233,7 +1233,7 @@ fn render_browse_tab(
         let (star_r, star_resp) = ui.allocate_exact_size(star_size, Sense::click());
         let fav_on = st.favorites_only;
         ui.painter().rect_filled(star_r, 4.0, if fav_on { t.row_selected } else if star_resp.hovered() { t.hover } else { Color32::TRANSPARENT });
-        icons::paint(ui.painter(), star_r.shrink(3.0), Icon::Marker, if fav_on { t.cyan } else { t.text_dim });
+        icons::paint(ui.painter(), star_r.shrink(3.0), Icon::Marker, if fav_on { CYAN } else { t.text_dim });
         if star_resp.clicked() {
             st.favorites_only = !st.favorites_only;
         }
@@ -1263,7 +1263,7 @@ fn render_browse_tab(
         } else if resp.hovered() {
             ui.painter().rect_filled(r, 4.0, t.hover);
         }
-        icons::paint(ui.painter(), Rect::from_center_size(pos2(r.min.x + 12.0, r.center().y), vec2(12.0, 12.0)), Icon::Folder, if all_selected { t.cyan } else { t.text_dim });
+        icons::paint(ui.painter(), Rect::from_center_size(pos2(r.min.x + 12.0, r.center().y), vec2(12.0, 12.0)), Icon::Folder, if all_selected { CYAN } else { t.text_dim });
         ui.painter().text(pos2(r.min.x + 26.0, r.center().y), Align2::LEFT_CENTER, "All Categories", Tokens::ui(11.5), if all_selected { t.text } else { t.text_dim });
         if resp.clicked() {
             st.selected_category = None;
@@ -1296,7 +1296,7 @@ fn render_browse_tab(
                 ui.painter(),
                 Rect::from_center_size(pos2(cr.min.x + 20.0, cr.center().y), vec2(12.0, 12.0)),
                 Icon::Folder,
-                if is_cat_active { t.cyan } else { t.text_dim },
+                if is_cat_active { CYAN } else { t.text_dim },
             );
 
             ui.painter().text(pos2(cr.min.x + 34.0, cr.center().y), Align2::LEFT_CENTER, cat.title(), Tokens::ui(11.5), if is_cat_active { t.text } else { t.text_dim });
@@ -1330,8 +1330,8 @@ fn render_browse_tab(
                         ui.painter().rect_filled(sr, 4.0, t.hover);
                     }
 
-                    icons::paint(ui.painter(), Rect::from_center_size(pos2(sr.min.x + 28.0, sr.center().y), vec2(10.0, 10.0)), Icon::Folder, if is_sub_active { t.cyan } else { t.text_faint });
-                    ui.painter().text(pos2(sr.min.x + 42.0, sr.center().y), Align2::LEFT_CENTER, sub, Tokens::ui(10.5), if is_sub_active { t.cyan } else { t.text_dim });
+                    icons::paint(ui.painter(), Rect::from_center_size(pos2(sr.min.x + 28.0, sr.center().y), vec2(10.0, 10.0)), Icon::Folder, if is_sub_active { CYAN } else { t.text_faint });
+                    ui.painter().text(pos2(sr.min.x + 42.0, sr.center().y), Align2::LEFT_CENTER, sub, Tokens::ui(10.5), if is_sub_active { CYAN } else { t.text_dim });
 
                     if sresp.clicked() {
                         st.selected_folder = Some(sub.to_string());
@@ -1350,7 +1350,7 @@ fn render_browse_tab(
         ui.add_space(8.0);
         icons::paint(ui.painter(), Rect::from_center_size(pos2(bot_bar_rect.min.x + 16.0, bot_bar_rect.center().y), vec2(12.0, 12.0)), Icon::Zoom, t.text_dim);
         ui.add_space(16.0);
-        ui.add(egui::Slider::new(&mut st.grid_scale, 1.0..=3.0).show_value(false).desired_width(sidebar_w - 50.0));
+        ui.add(egui::Slider::new(&mut st.grid_scale, 1.0..=3.0).show_value(false));
     });
 
     // --------------------------------------------------------------------------------------------
@@ -1434,7 +1434,7 @@ fn render_browse_tab(
                     );
 
                     if is_sel {
-                        ui.painter().rect_stroke(card_r, t.radius_sm, Stroke::new(1.5, t.cyan), StrokeKind::Inside);
+                        ui.painter().rect_stroke(card_r, t.radius_sm, Stroke::new(1.5, CYAN), StrokeKind::Inside);
                     } else if resp.hovered() {
                         ui.painter().rect_stroke(card_r, t.radius_sm, Stroke::new(1.0, t.hover), StrokeKind::Inside);
                     }
@@ -1465,7 +1465,7 @@ fn render_browse_tab(
                         PresetCategory::SoundFx => Icon::Audio,
                         PresetCategory::Favorites => Icon::Marker,
                     };
-                    icons::paint(ui.painter(), Rect::from_center_size(pos2(bot_rect.min.x + 6.0, bot_rect.center().y), vec2(10.0, 10.0)), badge_icon, t.cyan);
+                    icons::paint(ui.painter(), Rect::from_center_size(pos2(bot_rect.min.x + 6.0, bot_rect.center().y), vec2(10.0, 10.0)), badge_icon, CYAN);
 
                     // Preset Title
                     let title_max_w = bot_rect.width() - 32.0;
@@ -1485,7 +1485,7 @@ fn render_browse_tab(
                         ui.painter(),
                         Rect::from_center_size(star_pos, vec2(10.0, 10.0)),
                         Icon::Marker,
-                        if is_fav { t.cyan } else { Color32::from_rgba_unmultiplied(100, 116, 139, 80) },
+                        if is_fav { CYAN } else { Color32::from_rgba_unmultiplied(100, 116, 139, 80) },
                     );
 
                     // Interactions
@@ -1550,7 +1550,7 @@ fn render_edit_tab(
     ed_ui.horizontal(|ui| {
         ui.label(egui::RichText::new(selected_preset.name).font(Tokens::semibold(16.0)).color(t.text));
         ui.add_space(8.0);
-        ui.label(egui::RichText::new(format!("·  {}", selected_preset.category.title())).color(t.cyan));
+        ui.label(egui::RichText::new(format!("·  {}", selected_preset.category.title())).color(CYAN));
     });
     ed_ui.label(egui::RichText::new(selected_preset.description).color(t.text_faint));
 

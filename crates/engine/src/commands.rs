@@ -2971,6 +2971,11 @@ fn build() -> Vec<CommandSpec> {
             if matches!(def.kind, filmcraft_project::EffectKind::VideoTransition | filmcraft_project::EffectKind::AudioTransition) {
                 let mut q = p.clone();
                 q["effect"] = json!(def.id);
+                if q.get("clip").is_none() {
+                    if let Some(c) = q.get("clips").and_then(|v| v.as_array()).and_then(|a| a.first()).and_then(|v| v.as_u64()) {
+                        q["clip"] = json!(c);
+                    }
+                }
                 return apply_transition(s, &q, if def.kind == filmcraft_project::EffectKind::VideoTransition { TrackKind::Video } else { TrackKind::Audio });
             }
             let clips = clips_p(s, p);
@@ -4189,6 +4194,16 @@ fn set_transition(s: &mut Session, p: &Value) -> Result<Value> {
 }
 
 fn apply_transition(s: &mut Session, p: &Value, kind: TrackKind) -> Result<Value> {
+    let mut p_buf;
+    let p = if p.get("clip").is_none()
+        && let Some(c) = p.get("clips").and_then(|v| v.as_array()).and_then(|a| a.first()).and_then(|v| v.as_u64())
+    {
+        p_buf = p.clone();
+        p_buf["clip"] = json!(c);
+        &p_buf
+    } else {
+        p
+    };
     if p.get("clip").is_none()
         && let Some(r) = crate::sequence_extras::apply_to_selection(s, p, kind)?
     {
@@ -4197,6 +4212,7 @@ fn apply_transition(s: &mut Session, p: &Value, kind: TrackKind) -> Result<Value
     let (track, tr) = preview_transition(s, p, kind)?;
     let label = format!("Apply {}", tr.effect.def().map_or("Transition", |d| d.name));
     let id = s.edit_sequence(&label, |q, ctx, _| Ok(edit::add_transition(q, track, tr, ctx)?))?;
+    s.state.transition_selection = vec![id];
     Ok(json!({"transition": id.0}))
 }
 
@@ -4222,7 +4238,9 @@ pub fn preview_transition(s: &Session, p: &Value, kind: TrackKind) -> Result<(Tr
         None => s.prefs.timeline.audio_transition_duration(rate),
     };
     let t = s.playhead();
-    let clip = clip_p(p, "clip");
+    let clip = clip_p(p, "clip").or_else(|| {
+        p.get("clips").and_then(|v| v.as_array()).and_then(|a| a.first()).and_then(|v| v.as_u64()).map(ClipId)
+    });
     let edge = str_p(p, "edge").map(str::to_string);
     let targeted = s.targeting().targeted;
     let q = s.active_sequence().ok_or(EngineError::NoSequence)?;

@@ -219,6 +219,9 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect, which: Which)
             }
         } else {
             app.frames.request(key, rate.tick_of(frame), scale, &project, 0);
+            if which == Which::Program && !app.scrub.is_open() {
+                app.frames.prefetch_ahead(key, rate, scale, &project, 12);
+            }
         }
         let asked = asked_before(app, prefix, key, playing);
         let tex_name = if channel { format!("monitor-{prefix}-{display:?}") } else { format!("monitor-{prefix}") };

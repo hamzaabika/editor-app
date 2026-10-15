@@ -369,12 +369,12 @@ pub fn prefetch_depth(speed: f64) -> i64 {
 /// Playback starts its clock once this many frames from the playhead are ready, or after
 /// [`PREROLL_TIMEOUT_S`]: otherwise the first frames after Play are due before any decoder had a
 /// chance to produce them (a seek decodes from the previous keyframe).
-pub const PREROLL_FRAMES: i64 = 6;
+pub const PREROLL_FRAMES: i64 = 4;
 
 /// Seconds before a scrubbed-to frame whose frames a seek still decodes in full (see
 /// [`FrameServer::request`]); earlier non-reference pictures are skipped on the way.
 pub const SCRUB_KEEP_S: f64 = 2.0;
-pub const PREROLL_TIMEOUT_S: f64 = 0.5;
+pub const PREROLL_TIMEOUT_S: f64 = 1.0;
 
 /// Which frames playback asks for, given the per-frame render cost (s), the displayed frame rate
 /// and the worker count: `(lead, stride)`. While the workers keep up, every frame from the
@@ -743,6 +743,15 @@ impl FrameServer {
             if *prefetch {
                 c.store(true, Ordering::Relaxed);
             }
+        }
+    }
+
+    /// Prefetch upcoming frames ahead of the parked playhead so starting playback is instantaneous and lag-free.
+    pub fn prefetch_ahead(&self, key: FrameKey, rate: filmcraft_time::FrameRate, scale: f32, project: &Arc<Project>, count: usize) {
+        for i in 1..=count {
+            let f = key.frame + i as i64;
+            let k = FrameKey { frame: f, ..key };
+            self.request_job(k, rate.tick_of(f), scale, project, (i as u32) + 8, true, None);
         }
     }
 

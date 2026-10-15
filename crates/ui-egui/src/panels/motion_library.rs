@@ -594,76 +594,175 @@ fn apply_motion_preset(
             let end = it.start + it.duration;
 
             match preset.id {
-                "zoom_rotate_in" | "elastic_pop_in" => {
+                "zoom_rotate_in" => {
                     if st.in_enabled {
-                        // Keyframe 1: Start scaled down with rotation
-                        let _ = app.session.execute(
-                            "effects.setParam",
-                            json!({
-                                "clip": clip_id.0,
-                                "effect": "motion",
-                                "param": "scale",
-                                "value": (50.0 / st.intensity.max(0.2)) as f64,
-                                "keyframe": true,
-                                "time": start.0
-                            }),
-                        );
-                        let _ = app.session.execute(
-                            "effects.setParam",
-                            json!({
-                                "clip": clip_id.0,
-                                "effect": "motion",
-                                "param": "rotation",
-                                "value": -15.0 * st.intensity as f64,
-                                "keyframe": true,
-                                "time": start.0
-                            }),
-                        );
-                        let _ = app.session.execute(
-                            "effects.setParam",
-                            json!({
-                                "clip": clip_id.0,
-                                "effect": "opacity",
-                                "param": "opacity",
-                                "value": 0.0,
-                                "keyframe": true,
-                                "time": start.0
-                            }),
-                        );
+                        let steps = 10;
+                        for s in 0..=steps {
+                            let u = s as f32 / steps as f32;
+                            let eased = st.in_easing.evaluate(u);
+                            let t_curr = (start + Tick((t_in.0 as f32 * u) as i64)).min(end);
+                            let start_scale = 45.0 / st.intensity.clamp(0.4, 2.0) as f64;
+                            let scale = start_scale + (100.0 - start_scale) * eased as f64;
+                            let rot = (-14.0 * (1.0 - eased) * st.intensity) as f64;
+                            let op = ((u / 0.35).min(1.0) * 100.0) as f64;
 
-                        // Keyframe 2: Settle at normal scale & rotation
-                        let t_settle = (start + t_in).min(end);
+                            let _ = app.session.execute(
+                                "effects.setParam",
+                                json!({
+                                    "clip": clip_id.0,
+                                    "effect": "motion",
+                                    "param": "scale",
+                                    "value": scale,
+                                    "keyframe": true,
+                                    "time": t_curr.0
+                                }),
+                            );
+                            let _ = app.session.execute(
+                                "effects.setParam",
+                                json!({
+                                    "clip": clip_id.0,
+                                    "effect": "motion",
+                                    "param": "rotation",
+                                    "value": rot,
+                                    "keyframe": true,
+                                    "time": t_curr.0
+                                }),
+                            );
+                            let _ = app.session.execute(
+                                "effects.setParam",
+                                json!({
+                                    "clip": clip_id.0,
+                                    "effect": "opacity",
+                                    "param": "opacity",
+                                    "value": op,
+                                    "keyframe": true,
+                                    "time": t_curr.0
+                                }),
+                            );
+                        }
+                    }
+                }
+                "elastic_pop_in" => {
+                    if st.in_enabled {
+                        let steps = 14;
+                        for s in 0..=steps {
+                            let u = s as f32 / steps as f32;
+                            let eased = EasingType::Elastic.evaluate(u);
+                            let t_curr = (start + Tick((t_in.0 as f32 * u) as i64)).min(end);
+                            let start_scale = 20.0 / st.intensity.clamp(0.4, 2.0) as f64;
+                            let scale = start_scale + (100.0 - start_scale) * eased as f64;
+                            let op = ((u / 0.25).min(1.0) * 100.0) as f64;
+
+                            let _ = app.session.execute(
+                                "effects.setParam",
+                                json!({
+                                    "clip": clip_id.0,
+                                    "effect": "motion",
+                                    "param": "scale",
+                                    "value": scale,
+                                    "keyframe": true,
+                                    "time": t_curr.0
+                                }),
+                            );
+                            let _ = app.session.execute(
+                                "effects.setParam",
+                                json!({
+                                    "clip": clip_id.0,
+                                    "effect": "opacity",
+                                    "param": "opacity",
+                                    "value": op,
+                                    "keyframe": true,
+                                    "time": t_curr.0
+                                }),
+                            );
+                        }
+                    }
+                }
+                "slide_overshoot" => {
+                    if st.in_enabled {
+                        let base_offset = match st.direction {
+                            Direction::Left => [-1920.0 * st.intensity as f64, 0.0],
+                            Direction::Right => [1920.0 * st.intensity as f64, 0.0],
+                            Direction::Up => [0.0, 1080.0 * st.intensity as f64],
+                            Direction::Down => [0.0, -1080.0 * st.intensity as f64],
+                            Direction::CenterZoom => [0.0, 0.0],
+                        };
+                        let steps = 12;
+                        for s in 0..=steps {
+                            let u = s as f32 / steps as f32;
+                            let eased = EasingType::Overshoot.evaluate(u);
+                            let t_curr = (start + Tick((t_in.0 as f32 * u) as i64)).min(end);
+                            let pos = [base_offset[0] * (1.0 - eased as f64), base_offset[1] * (1.0 - eased as f64)];
+                            let op = ((u / 0.25).min(1.0) * 100.0) as f64;
+
+                            let _ = app.session.execute(
+                                "effects.setParam",
+                                json!({
+                                    "clip": clip_id.0,
+                                    "effect": "motion",
+                                    "param": "position",
+                                    "value": pos,
+                                    "keyframe": true,
+                                    "time": t_curr.0
+                                }),
+                            );
+                            let _ = app.session.execute(
+                                "effects.setParam",
+                                json!({
+                                    "clip": clip_id.0,
+                                    "effect": "opacity",
+                                    "param": "opacity",
+                                    "value": op,
+                                    "keyframe": true,
+                                    "time": t_curr.0
+                                }),
+                            );
+                        }
+                    }
+                }
+                "shake_blur" => {
+                    let _ = app.session.execute(
+                        "effects.apply",
+                        json!({ "clips": [clip_id.0], "effect": "gaussian_blur" }),
+                    );
+                    let shake_offsets = [
+                        [0.0, 0.0],
+                        [-24.0 * st.intensity as f64, 18.0 * st.intensity as f64],
+                        [22.0 * st.intensity as f64, -14.0 * st.intensity as f64],
+                        [-16.0 * st.intensity as f64, 12.0 * st.intensity as f64],
+                        [12.0 * st.intensity as f64, -8.0 * st.intensity as f64],
+                        [-8.0 * st.intensity as f64, 5.0 * st.intensity as f64],
+                        [4.0 * st.intensity as f64, -2.0 * st.intensity as f64],
+                        [0.0, 0.0],
+                    ];
+                    let dt = Tick(t_in.0 / (shake_offsets.len() as i64).max(1));
+                    for (idx, off) in shake_offsets.iter().enumerate() {
+                        let t_curr = (start + Tick(dt.0 * idx as i64)).min(end);
                         let _ = app.session.execute(
                             "effects.setParam",
                             json!({
                                 "clip": clip_id.0,
                                 "effect": "motion",
-                                "param": "scale",
-                                "value": 100.0,
+                                "param": "position",
+                                "value": off,
                                 "keyframe": true,
-                                "time": t_settle.0
+                                "time": t_curr.0
                             }),
                         );
+                        let blur = if idx == 0 || idx == shake_offsets.len() - 1 {
+                            0.0
+                        } else {
+                            (28.0 * st.intensity as f64) * (1.0 - (idx as f64 / shake_offsets.len() as f64))
+                        };
                         let _ = app.session.execute(
                             "effects.setParam",
                             json!({
                                 "clip": clip_id.0,
-                                "effect": "motion",
-                                "param": "rotation",
-                                "value": 0.0,
+                                "effect": "gaussian_blur",
+                                "param": "blurriness",
+                                "value": blur,
                                 "keyframe": true,
-                                "time": t_settle.0
-                            }),
-                        );
-                        let _ = app.session.execute(
-                            "effects.setParam",
-                            json!({
-                                "clip": clip_id.0,
-                                "effect": "opacity",
-                                "param": "opacity",
-                                "value": 100.0,
-                                "keyframe": true,
-                                "time": t_settle.0
+                                "time": t_curr.0
                             }),
                         );
                     }
@@ -671,159 +770,76 @@ fn apply_motion_preset(
                 "zoom_rotate_out_shake" => {
                     if st.out_enabled {
                         let t_start_out = (end - t_out).max(start);
-                        let _ = app.session.execute(
-                            "effects.setParam",
-                            json!({
-                                "clip": clip_id.0,
-                                "effect": "motion",
-                                "param": "scale",
-                                "value": 100.0,
-                                "keyframe": true,
-                                "time": t_start_out.0
-                            }),
-                        );
-                        let _ = app.session.execute(
-                            "effects.setParam",
-                            json!({
-                                "clip": clip_id.0,
-                                "effect": "motion",
-                                "param": "rotation",
-                                "value": 0.0,
-                                "keyframe": true,
-                                "time": t_start_out.0
-                            }),
-                        );
+                        let steps = 10;
+                        for s in 0..=steps {
+                            let u = s as f32 / steps as f32;
+                            let eased = st.out_easing.evaluate(u);
+                            let t_curr = (t_start_out + Tick((t_out.0 as f32 * u) as i64)).min(end);
+                            let scale = 100.0 + (35.0 * st.intensity as f64) * eased as f64;
+                            let rot = (12.0 * st.intensity as f64) * eased as f64;
+                            let op = ((1.0 - u).clamp(0.0, 1.0) * 100.0) as f64;
 
-                        let _ = app.session.execute(
-                            "effects.setParam",
-                            json!({
-                                "clip": clip_id.0,
-                                "effect": "motion",
-                                "param": "scale",
-                                "value": (140.0 * st.intensity) as f64,
-                                "keyframe": true,
-                                "time": end.0
-                            }),
-                        );
-                        let _ = app.session.execute(
-                            "effects.setParam",
-                            json!({
-                                "clip": clip_id.0,
-                                "effect": "motion",
-                                "param": "rotation",
-                                "value": 12.0 * st.intensity as f64,
-                                "keyframe": true,
-                                "time": end.0
-                            }),
-                        );
-                        let _ = app.session.execute(
-                            "effects.setParam",
-                            json!({
-                                "clip": clip_id.0,
-                                "effect": "opacity",
-                                "param": "opacity",
-                                "value": 0.0,
-                                "keyframe": true,
-                                "time": end.0
-                            }),
-                        );
-                    }
-                }
-                "shake_blur" => {
-                    // Apply camera shake / gaussian blur impact
-                    let _ = app.session.execute(
-                        "effects.apply",
-                        json!({ "clips": [clip_id.0], "effect": "transform" }),
-                    );
-                    let _ = app.session.execute(
-                        "effects.apply",
-                        json!({ "clips": [clip_id.0], "effect": "gaussian_blur" }),
-                    );
-                    // Shutter keyframes
-                    let step = Tick(t_in.0 / 4);
-                    let _ = app.session.execute(
-                        "effects.setParam",
-                        json!({
-                            "clip": clip_id.0,
-                            "effect": "gaussian_blur",
-                            "param": "blurriness",
-                            "value": 24.0 * st.intensity as f64,
-                            "keyframe": true,
-                            "time": start.0
-                        }),
-                    );
-                    let _ = app.session.execute(
-                        "effects.setParam",
-                        json!({
-                            "clip": clip_id.0,
-                            "effect": "gaussian_blur",
-                            "param": "blurriness",
-                            "value": 0.0,
-                            "keyframe": true,
-                            "time": (start + Tick(step.0 * 3)).0
-                        }),
-                    );
-                }
-                "slide_overshoot" => {
-                    if st.in_enabled {
-                        let offset = match st.direction {
-                            Direction::Left => [-1920.0 * st.intensity as f64, 0.0],
-                            Direction::Right => [1920.0 * st.intensity as f64, 0.0],
-                            Direction::Up => [0.0, 1080.0 * st.intensity as f64],
-                            Direction::Down => [0.0, -1080.0 * st.intensity as f64],
-                            Direction::CenterZoom => [0.0, 0.0],
-                        };
-                        let _ = app.session.execute(
-                            "effects.setParam",
-                            json!({
-                                "clip": clip_id.0,
-                                "effect": "motion",
-                                "param": "position",
-                                "value": offset,
-                                "keyframe": true,
-                                "time": start.0
-                            }),
-                        );
-                        let _ = app.session.execute(
-                            "effects.setParam",
-                            json!({
-                                "clip": clip_id.0,
-                                "effect": "motion",
-                                "param": "position",
-                                "value": [0.0, 0.0],
-                                "keyframe": true,
-                                "time": (start + t_in).0
-                            }),
-                        );
+                            let _ = app.session.execute(
+                                "effects.setParam",
+                                json!({
+                                    "clip": clip_id.0,
+                                    "effect": "motion",
+                                    "param": "scale",
+                                    "value": scale,
+                                    "keyframe": true,
+                                    "time": t_curr.0
+                                }),
+                            );
+                            let _ = app.session.execute(
+                                "effects.setParam",
+                                json!({
+                                    "clip": clip_id.0,
+                                    "effect": "motion",
+                                    "param": "rotation",
+                                    "value": rot,
+                                    "keyframe": true,
+                                    "time": t_curr.0
+                                }),
+                            );
+                            let _ = app.session.execute(
+                                "effects.setParam",
+                                json!({
+                                    "clip": clip_id.0,
+                                    "effect": "opacity",
+                                    "param": "opacity",
+                                    "value": op,
+                                    "keyframe": true,
+                                    "time": t_curr.0
+                                }),
+                            );
+                        }
                     }
                 }
                 _ => {
-                    // Default scale pulse
-                    let _ = app.session.execute(
-                        "effects.setParam",
-                        json!({
-                            "clip": clip_id.0,
-                            "effect": "motion",
-                            "param": "scale",
-                            "value": 115.0 * st.intensity as f64,
-                            "keyframe": true,
-                            "time": start.0
-                        }),
-                    );
-                    let _ = app.session.execute(
-                        "effects.setParam",
-                        json!({
-                            "clip": clip_id.0,
-                            "effect": "motion",
-                            "param": "scale",
-                            "value": 100.0,
-                            "keyframe": true,
-                            "time": (start + t_in).0
-                        }),
-                    );
+                    if st.in_enabled {
+                        let steps = 10;
+                        for s in 0..=steps {
+                            let u = s as f32 / steps as f32;
+                            let eased = st.in_easing.evaluate(u);
+                            let t_curr = (start + Tick((t_in.0 as f32 * u) as i64)).min(end);
+                            let start_scale = 100.0 + (18.0 * st.intensity as f64);
+                            let scale = start_scale - (18.0 * st.intensity as f64) * eased as f64;
+                            let _ = app.session.execute(
+                                "effects.setParam",
+                                json!({
+                                    "clip": clip_id.0,
+                                    "effect": "motion",
+                                    "param": "scale",
+                                    "value": scale,
+                                    "keyframe": true,
+                                    "time": t_curr.0
+                                }),
+                            );
+                        }
+                    }
                 }
             }
-            Ok(format!("Applied motion preset '{}' to clip", preset.name))
+            Ok(format!("Applied motion preset '{}' with dynamic keyframes", preset.name))
         }
 
         PresetCategory::Transitions => {
@@ -835,20 +851,45 @@ fn apply_motion_preset(
                 "fast_zoom_crash" => "cross_zoom",
                 "film_dissolve" => "film_dissolve",
                 "camera_flash" => "dip_to_white",
+                "dip_to_black" => "dip_to_black",
+                "page_peel" => "page_peel",
+                "spinback_3d" => "spinback_3d",
                 _ => "cross_dissolve",
             };
-            let res = app.session.execute(
-                "effects.apply",
-                json!({
-                    "clips": [clip_id.0],
-                    "effect": transition_name,
-                    "edge": if st.in_enabled { "in" } else { "out" }
-                }),
-            );
-            match res {
-                Ok(_) => Ok(format!("Applied transition '{}'", preset.name)),
-                Err(e) => Err(format!("Transition application error: {e}")),
+            let frames = (st.in_duration * 30.0).round().max(1.0) as i64;
+            let mut applied_edges = Vec::new();
+            if st.in_enabled {
+                let res = app.session.execute(
+                    "sequence.applyVideoTransition",
+                    json!({
+                        "clip": clip_id.0,
+                        "effect": transition_name,
+                        "edge": "in",
+                        "frames": frames
+                    }),
+                );
+                if res.is_ok() {
+                    applied_edges.push("In");
+                }
             }
+            if st.out_enabled {
+                let res = app.session.execute(
+                    "sequence.applyVideoTransition",
+                    json!({
+                        "clip": clip_id.0,
+                        "effect": transition_name,
+                        "edge": "out",
+                        "frames": frames
+                    }),
+                );
+                if res.is_ok() {
+                    applied_edges.push("Out");
+                }
+            }
+            if applied_edges.is_empty() {
+                return Err(format!("Could not apply transition '{}' to the selected clip.", preset.name));
+            }
+            Ok(format!("Applied {} transition '{}' to clip", applied_edges.join(" & "), preset.name))
         }
 
         PresetCategory::TitlesTypography => {
@@ -865,15 +906,48 @@ fn apply_motion_preset(
                 "graphics.newText",
                 json!({
                     "text": title_text,
-                    "size": if preset.id.contains("lower") { 38 } else { 72 },
+                    "size": if preset.id.contains("lower") { 42 } else { 76 },
                     "newClip": true,
                     "time": playhead.0,
                     "seconds": 4.0
                 }),
             );
-            match res {
-                Ok(_) => Ok(format!("Created Title '{}' at playhead", title_text)),
-                Err(e) => Err(format!("Failed to insert title: {e}")),
+            if let Ok(val) = res {
+                if let Some(new_cid) = val.get("clip").and_then(Value::as_u64) {
+                    let t_title_dur = Tick::from_seconds_f64(0.65);
+                    for s in 0..=10 {
+                        let u = s as f32 / 10.0;
+                        let eased = EasingType::Overshoot.evaluate(u);
+                        let t_curr = playhead + Tick((t_title_dur.0 as f32 * u) as i64);
+                        let scale = 50.0 + 50.0 * eased as f64;
+                        let op = ((u / 0.3).min(1.0) * 100.0) as f64;
+                        let _ = app.session.execute(
+                            "effects.setParam",
+                            json!({
+                                "clip": new_cid,
+                                "effect": "motion",
+                                "param": "scale",
+                                "value": scale,
+                                "keyframe": true,
+                                "time": t_curr.0
+                            }),
+                        );
+                        let _ = app.session.execute(
+                            "effects.setParam",
+                            json!({
+                                "clip": new_cid,
+                                "effect": "opacity",
+                                "param": "opacity",
+                                "value": op,
+                                "keyframe": true,
+                                "time": t_curr.0
+                            }),
+                        );
+                    }
+                }
+                Ok(format!("Created animated title '{}' at playhead", title_text))
+            } else {
+                Err("Failed to create title clip.".into())
             }
         }
 

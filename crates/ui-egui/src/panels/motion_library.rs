@@ -14,7 +14,7 @@ use egui::{
 };
 use serde_json::json;
 
-use filmcraft_project::{ClipId, TrackItem, TrackKind};
+use filmcraft_project::{ClipId, TrackItem};
 use filmcraft_time::Tick;
 
 use crate::icons::{self, Icon};
@@ -760,7 +760,7 @@ fn apply_motion_preset(
                             "param": "blurriness",
                             "value": 0.0,
                             "keyframe": true,
-                            "time": (start + step * 3).0
+                            "time": (start + Tick(step.0 * 3)).0
                         }),
                     );
                 }

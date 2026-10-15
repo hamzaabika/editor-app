@@ -913,7 +913,7 @@ fn apply_motion_preset(
                 }),
             );
             if let Ok(val) = res {
-                if let Some(new_cid) = val.get("clip").and_then(Value::as_u64) {
+                if let Some(new_cid) = val.get("clip").and_then(|v| v.as_u64()) {
                     let t_title_dur = Tick::from_seconds_f64(0.65);
                     for s in 0..=10 {
                         let u = s as f32 / 10.0;

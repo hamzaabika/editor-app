@@ -229,7 +229,8 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect, which: Which)
                 .map(|p| (key, p))
                 .or_else(|| app.frames.get_plan_any_scale(&key))
                 .or_else(|| app.frames.nearest_plan(key, 6))
-                .or_else(|| asked.iter().find_map(|k| app.frames.get_plan(k).map(|p| (*k, p))));
+                .or_else(|| asked.iter().find_map(|k| app.frames.get_plan(k).map(|p| (*k, p))))
+                .or_else(|| app.frames.get_plan_any_scale_or_latest_rev(&key));
             match found {
                 Some((k, plan)) => (app.gpu_present(k, &plan).map(|(id, _)| id), Some(k)),
                 None => (app.gpu.as_ref().and_then(|g| g.texture), app.gpu.as_ref().and_then(|g| g.last_key)),
@@ -508,7 +509,8 @@ fn cpu_texture(
         .or_else(|| app.frames.get_any_scale(&key))
         .or_else(|| (1..=6).map(|d| FrameKey { frame: key.frame.saturating_sub(d), ..key }).find_map(|k| app.frames.get(&k).map(|img| (k, img))))
         .or_else(|| (1..=6).map(|d| FrameKey { frame: key.frame.saturating_sub(d), ..key }).find_map(|k| app.frames.get_any_scale(&k)))
-        .or_else(|| asked.iter().find_map(|k| app.frames.get(k).map(|img| (*k, img))));
+        .or_else(|| asked.iter().find_map(|k| app.frames.get(k).map(|img| (*k, img))))
+        .or_else(|| app.frames.get_any_scale_or_latest_rev(&key));
     match found {
         Some((k, img)) => {
             let tex = if mode.is_channel() {

@@ -515,6 +515,30 @@ impl FrameServer {
         None
     }
 
+    /// Retrieve a frame matching target and frame number, prioritizing the current revision,
+    /// but falling back to the latest available revision while a new revision renders.
+    pub fn get_any_scale_or_latest_rev(&self, k: &FrameKey) -> Option<(FrameKey, Arc<Rgba>)> {
+        if let Some(res) = self.get_any_scale(k) {
+            return Some(res);
+        }
+        let mut c = self.shared.done.lock().unwrap_or_else(|e| e.into_inner());
+        let candidate = c
+            .map
+            .iter()
+            .filter(|(key, _)| key.target == k.target && key.frame == k.frame)
+            .max_by_key(|(key, _)| key.revision)
+            .map(|(key, (v, _))| (*key, v.clone()));
+        if let Some((found_key, v)) = candidate {
+            c.clock += 1;
+            let clock = c.clock;
+            if let Some((_, s)) = c.map.get_mut(&found_key) {
+                *s = clock;
+            }
+            return Some((found_key, v));
+        }
+        None
+    }
+
     pub fn get_plan(&self, k: &FrameKey) -> Option<Arc<GpuPlan>> {
         self.shared.plans.lock().unwrap_or_else(|e| e.into_inner()).get(k)
     }
@@ -534,6 +558,30 @@ impl FrameServer {
         })
     }
 
+    /// Retrieve a GPU plan matching target and frame number, prioritizing the current revision,
+    /// but falling back to the latest available revision while a new revision renders.
+    pub fn get_plan_any_scale_or_latest_rev(&self, k: &FrameKey) -> Option<(FrameKey, Arc<GpuPlan>)> {
+        if let Some(res) = self.get_plan_any_scale(k) {
+            return Some(res);
+        }
+        let mut g = self.shared.plans.lock().unwrap_or_else(|e| e.into_inner());
+        let candidate = g
+            .map
+            .iter()
+            .filter(|(key, _)| key.target == k.target && key.frame == k.frame)
+            .max_by_key(|(key, _)| key.revision)
+            .map(|(key, (p, _, _))| (*key, p.clone()));
+        if let Some((found_key, p)) = candidate {
+            g.clock += 1;
+            let clock = g.clock;
+            if let Some((_, s, _)) = g.map.get_mut(&found_key) {
+                *s = clock;
+            }
+            return Some((found_key, p));
+        }
+        None
+    }
+
     /// Whether the exact frame (image or plan) is ready.
     pub fn is_ready(&self, k: &FrameKey) -> bool {
         match k.target {
@@ -545,9 +593,31 @@ impl FrameServer {
     /// Nearest cached plan at or before `frame`.
     pub fn nearest_plan(&self, key: FrameKey, max_back: i64) -> Option<(FrameKey, Arc<GpuPlan>)> {
         let mut g = self.shared.plans.lock().unwrap_or_else(|e| e.into_inner());
-        (0..=max_back).find_map(|d| {
+        let exact = (0..=max_back).find_map(|d| {
             let k = FrameKey { frame: key.frame - d, ..key };
             g.get(&k).map(|p| (k, p))
+        });
+        if exact.is_some() {
+            return exact;
+        }
+        (0..=max_back).find_map(|d| {
+            let target_frame = key.frame - d;
+            let cand = g
+                .map
+                .iter()
+                .filter(|(k, _)| k.target == key.target && k.frame == target_frame)
+                .max_by_key(|(k, _)| k.revision)
+                .map(|(k, (p, _, _))| (*k, p.clone()));
+            if let Some((found_key, p)) = cand {
+                g.clock += 1;
+                let clock = g.clock;
+                if let Some((_, s, _)) = g.map.get_mut(&found_key) {
+                    *s = clock;
+                }
+                Some((found_key, p))
+            } else {
+                None
+            }
         })
     }
 

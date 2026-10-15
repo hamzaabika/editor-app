@@ -197,6 +197,19 @@ impl State {
     fn at_or_before(&self, pts: i64, draft_ok: bool) -> Option<Arc<VideoFrame>> {
         self.cached(pts, draft_ok).or_else(|| self.frames.range(..=pts).rev().find(|(p, _)| draft_ok || !self.drafts.contains(p)).map(|(_, f)| f)).cloned()
     }
+
+    /// The nearest usable frame at or before `pts`, or the closest available decoded frame
+    /// in this GOP if `pts` is before the stream's first decoded frame.
+    fn at_or_nearest(&self, pts: i64, draft_ok: bool) -> Option<Arc<VideoFrame>> {
+        if let Some(f) = self.at_or_before(pts, draft_ok) {
+            return Some(f);
+        }
+        self.frames
+            .iter()
+            .filter(|(p, _)| draft_ok || !self.drafts.contains(p))
+            .min_by_key(|(p, _)| (p - pts).abs())
+            .map(|(_, f)| f.clone())
+    }
 }
 
 thread_local! {
@@ -767,7 +780,7 @@ impl GopCache {
             st.next = usize::MAX;
         }
         // nearest decoded frame at or before the wanted pts (robust to decoder pts quirks)
-        st.at_or_before(want_pts, draft).ok_or_else(|| CodecError::Decode("frame not produced".into()))
+        st.at_or_nearest(want_pts, draft).ok_or_else(|| CodecError::Decode("frame not produced".into()))
     }
 
     /// A nested request (see [`Self::frame`]): decode from the sync sample with a fresh decoder,
@@ -776,13 +789,22 @@ impl GopCache {
         let mut d = s.make_decoder()?;
         let mut next = usize::MAX;
         let out = Self::decode_to(s, d.as_mut(), &mut next, i, want_pts, n)?;
-        let f = out
-            .into_iter()
-            .filter(|p| p.pts <= want_pts)
-            .max_by_key(|p| p.pts)
-            .map(|p| p.frame)
+        let best_idx = out
+            .iter()
+            .enumerate()
+            .filter(|(_, p)| p.pts <= want_pts)
+            .max_by_key(|(_, p)| p.pts)
+            .map(|(idx, _)| idx)
+            .or_else(|| {
+                out.iter()
+                    .enumerate()
+                    .min_by_key(|(_, p)| (p.pts - want_pts).abs())
+                    .map(|(idx, _)| idx)
+            })
             .ok_or_else(|| CodecError::Decode("frame not produced".into()))?;
-        Ok(Arc::new(self.finish(f)))
+        let mut out = out;
+        let p = out.swap_remove(best_idx);
+        Ok(Arc::new(self.finish(p.frame)))
     }
 
     /// Decode with `d` (positioned at `next`) until the picture with `want_pts` (sample `i`) comes out.
@@ -860,7 +882,7 @@ impl GopCache {
         for (pts, frame, draft) in res? {
             self.store_finished(&mut st, pts, frame, draft);
         }
-        st.at_or_before(want_pts, true).ok_or_else(|| CodecError::Decode("frame not produced".into()))
+        st.at_or_nearest(want_pts, true).ok_or_else(|| CodecError::Decode("frame not produced".into()))
     }
 }
 

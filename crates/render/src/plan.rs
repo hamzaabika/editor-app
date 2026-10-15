@@ -414,7 +414,19 @@ fn push_item(
         let lin = ((motion.a * motion.a + motion.b * motion.b).sqrt()).max((motion.c * motion.c + motion.d * motion.d).sqrt());
         let want = (lin * opts.scale as f64).clamp(1.0 / 64.0, 1.0) as f32;
         let time = crate::video_source_time(item, t, src.info().frame_rate());
-        let Ok(frame) = src.video_frame(FrameRequest { time, scale: want }) else { return };
+        let frame = match src.video_frame(FrameRequest { time, scale: want }) {
+            Ok(f) => f,
+            Err(_) => {
+                let fallback = item.source_in.max(Tick::ZERO);
+                if let Ok(f) = src.video_frame(FrameRequest { time: fallback, scale: want }) {
+                    f
+                } else if let Ok(f) = src.video_frame(FrameRequest { time: Tick::ZERO, scale: want }) {
+                    f
+                } else {
+                    return;
+                }
+            }
+        };
         let cs = crate::colorman::source_space(project, item.item, &frame);
         // HDR and wide-gamut media on a Rec. 709 sequence is converted on the GPU too (#965); log
         // media and other pipelines are converted on the CPU (below), and so are blended

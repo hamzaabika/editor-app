@@ -29,6 +29,7 @@ pub mod mismatch_dialog;
 pub mod mixer;
 pub mod monitor;
 pub mod monitor_view;
+pub mod motion_library;
 pub mod multicam;
 pub mod notes;
 pub mod panel_state;
@@ -105,6 +106,7 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, p: PanelKind, rect: Rect)
         PanelKind::EssentialSound => essential_sound::show(app, ui, rect),
         PanelKind::TextToSpeech => tts::show(app, ui, rect),
         PanelKind::ProjectNotes => notes::show(app, ui, rect),
+        PanelKind::Libraries => motion_library::show(app, ui, rect),
         other => crate::dock::placeholder(ui, rect, &app.tokens, &tlf!("{panel} — coming in a later milestone", panel = crate::i18n::t(other.title()))),
     }
 }

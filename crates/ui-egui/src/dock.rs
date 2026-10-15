@@ -77,7 +77,7 @@ impl PanelKind {
         match self {
             PanelKind::Project => "Project",
             PanelKind::MediaBrowser => "Media Browser",
-            PanelKind::Libraries => "Libraries",
+            PanelKind::Libraries => "Motion Library",
             PanelKind::Info => "Info",
             PanelKind::Effects => "Effects",
             PanelKind::Markers => "Markers",

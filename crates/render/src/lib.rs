@@ -554,7 +554,11 @@ fn plain_layer(frame: &VideoFrame, n: usize, opacity: f32, blend: Blend) -> Laye
 /// convert it with.
 fn media_frame(item: &TrackItem, t: Tick, sources: &dyn SourceProvider, want: f32, src_size: (u32, u32)) -> Option<(SharedSource, Arc<VideoFrame>, usize)> {
     let src = sources.source(item.item)?;
-    let frame = src.video_frame(FrameRequest { time: video_source_time(item, t, src.info().frame_rate()), scale: want }).ok()?;
+    let req_time = video_source_time(item, t, src.info().frame_rate());
+    let frame = src.video_frame(FrameRequest { time: req_time, scale: want })
+        .or_else(|_| src.video_frame(FrameRequest { time: item.source_in.max(Tick::ZERO), scale: want }))
+        .or_else(|_| src.video_frame(FrameRequest { time: Tick::ZERO, scale: want }))
+        .ok()?;
     let n = decimation(frame.width as f32, src_size.0 as f32 * want);
     Some((src, frame, n))
 }
@@ -695,7 +699,9 @@ pub fn render_item(project: &Project, item: ItemId, t: Tick, scale: f32, sources
         ItemKind::Sequence(s) => Some(render_seq(project, s, t, RenderOptions { scale, ..Default::default() }, sources)),
         _ => {
             let src = sources.source(item)?;
-            let f = src.video_frame(FrameRequest { time: t, scale }).ok()?;
+            let f = src.video_frame(FrameRequest { time: t, scale })
+                .or_else(|_| src.video_frame(FrameRequest { time: Tick::ZERO, scale }))
+                .ok()?;
             let full_w = src.info().video.as_ref().map_or(f.width, |v| v.width) as f32;
             let n = decimation(f.width as f32, full_w * scale);
             // the Source monitor shows media as SDR Rec. 709 (log/HDR tone mapped per its colour space)

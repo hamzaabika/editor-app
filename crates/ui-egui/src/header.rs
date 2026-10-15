@@ -116,9 +116,9 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
     let mut rx = rect.max.x - 12.0;
 
     // Helper for sleek modern buttons
-    let mut btn = |ui: &mut egui::Ui, icon: Icon, id: &str, tip: &str, app: &mut FilmcraftApp| -> egui::Response {
-        let r = Rect::from_center_size(pos2(rx - 14.0, rect.center().y), vec2(28.0, 28.0));
-        rx -= 34.0;
+    let btn = |ui: &mut egui::Ui, rx: &mut f32, icon: Icon, id: &str, tip: &str, app: &mut FilmcraftApp| -> egui::Response {
+        let r = Rect::from_center_size(pos2(*rx - 14.0, rect.center().y), vec2(28.0, 28.0));
+        *rx -= 34.0;
         let resp = ui.interact(r, egui::Id::new(("hdr", id)), Sense::click()).on_hover_text(tip);
         app.auto.add(&format!("header.{id}"), r, tip);
         if resp.hovered() {
@@ -128,17 +128,17 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
         resp
     };
 
-    if btn(ui, Icon::Fullscreen, "fullscreen", tl!("Full screen"), app).clicked() {
+    if btn(ui, &mut rx, Icon::Fullscreen, "fullscreen", tl!("Full screen"), app).clicked() {
         let fs = ui.ctx().input(|i| i.viewport().fullscreen.unwrap_or(false));
         ui.ctx().send_viewport_cmd(egui::ViewportCommand::Fullscreen(!fs));
     }
-    if btn(ui, Icon::Speaker, "volume", tl!("Volume"), app).clicked() {
+    if btn(ui, &mut rx, Icon::Speaker, "volume", tl!("Volume"), app).clicked() {
         app.ui.status = tl!("Master volume: use the Audio Track Mixer").into();
     }
-    if btn(ui, Icon::Search, "search", tl!("Search Effects & Assets"), app).clicked() {
+    if btn(ui, &mut rx, Icon::Search, "search", tl!("Search Effects & Assets"), app).clicked() {
         app.show_panel(crate::dock::PanelKind::Effects);
     }
-    if btn(ui, Icon::Bell, "notifications", tl!("Render Queue / Progress"), app).clicked() {
+    if btn(ui, &mut rx, Icon::Bell, "notifications", tl!("Render Queue / Progress"), app).clicked() {
         app.ui.mode = Mode::Export;
     }
 
@@ -166,14 +166,14 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
         _ => (Icon::Moon, tl!("Dark")),
     };
     let tip = format!("{}: {mode}", tl!("Appearance Mode"));
-    let appearance = btn(ui, icon, "appearance", &tip, app);
+    let appearance = btn(ui, &mut rx, icon, "appearance", &tip, app);
     appearance.context_menu(|ui| crate::panels::settings::appearance_context_menu(app, ui));
     if appearance.clicked() {
         crate::panels::settings::cycle_appearance(app, ui.ctx());
     }
 
     // Workspaces Manager Button
-    let ws_resp = btn(ui, Icon::Workspaces, "workspaces", tl!("Workspaces"), app);
+    let ws_resp = btn(ui, &mut rx, Icon::Workspaces, "workspaces", tl!("Workspaces"), app);
 
     // --- 5. Project Title & Save Status (Centered) ---
     let is_dirty = app.session.is_dirty();

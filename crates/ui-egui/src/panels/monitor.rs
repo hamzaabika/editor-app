@@ -1078,11 +1078,17 @@ fn transport_button(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect, prefi
     let t = app.tokens;
     let response = ui.interact(rect, egui::Id::new((prefix, command)), Sense::click()).on_hover_text(label);
     app.auto.add_response(&format!("{prefix}.transport.{command}"), &response, label);
-    if response.hovered() {
-        ui.painter().rect_filled(rect, 4.0, t.hover);
+    let is_play = matches!(command, "playback.toggle" | "source.playback.toggle");
+    if is_play {
+        let bg = if response.hovered() { t.accent_hover } else { t.accent };
+        ui.painter().rect_filled(rect, t.radius_sm, bg);
+    } else if response.hovered() {
+        ui.painter().rect_filled(rect, t.radius_sm, t.hover);
     }
-    let size = if matches!(command, "playback.toggle" | "source.playback.toggle") { 20.0 } else { 18.0 };
-    let color = if command == "media.toggleProxies" && app.session.media.use_proxies() {
+    let size = if is_play { 16.0 } else { 18.0 };
+    let color = if is_play {
+        Color32::WHITE
+    } else if command == "media.toggleProxies" && app.session.media.use_proxies() {
         t.accent
     } else if response.hovered() {
         t.tab_text_active

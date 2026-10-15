@@ -670,11 +670,11 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
     let ph = app.session.playhead();
     let px = layout.x_of(ph);
     if px >= content.min.x - 1.0 && px <= content.max.x + 1.0 {
-        // a short head on the tick row, as in Effect Controls, so it leaves the markers and timecodes clear
-        let (top, tip) = (ruler.max.y - 13.0, ruler.max.y);
-        let head = [pos2(px - 5.0, top), pos2(px + 5.0, top), pos2(px + 5.0, tip - 5.0), pos2(px, tip), pos2(px - 5.0, tip - 5.0)];
-        painter.add(egui::Shape::convex_polygon(head.to_vec(), t.playhead, Stroke::new(1.0, Color32::from_black_alpha(160))));
-        painter.line_segment([pos2(px, tip), pos2(px, content.max.y)], Stroke::new(1.0, t.playhead));
+        // a sleek diamond-cut head on the tick row, leaving markers and timecodes clear
+        let (top, tip) = (ruler.max.y - 14.0, ruler.max.y);
+        let head = [pos2(px - 5.5, top), pos2(px + 5.5, top), pos2(px + 5.5, tip - 6.0), pos2(px, tip), pos2(px - 5.5, tip - 6.0)];
+        painter.add(egui::Shape::convex_polygon(head.to_vec(), t.playhead, Stroke::new(1.0, Color32::from_rgb(0x0a, 0x0b, 0x10))));
+        painter.line_segment([pos2(px, tip), pos2(px, content.max.y)], Stroke::new(1.5, t.playhead));
     }
     // snap indicator
     if let Some(sx) = app.tl.snap_x.take() {
@@ -883,9 +883,9 @@ fn draw_clip(
     } else {
         base
     };
-    p.rect_filled(body, 0.0, fill);
-    // 1 pt lighter top edge
-    p.line_segment([pos2(body.min.x, body.min.y + 0.5), pos2(body.max.x, body.min.y + 0.5)], Stroke::new(1.0, lighten(fill, 0.15)));
+    p.rect_filled(body, t.radius_sm, fill);
+    // 1 pt subtle lighter top edge
+    p.line_segment([pos2(body.min.x + 2.0, body.min.y + 0.5), pos2(body.max.x - 2.0, body.min.y + 0.5)], Stroke::new(1.0, lighten(fill, 0.15)));
     let name_h = 16.0;
     let w = body.width();
     // video thumbnails, aspect-correct, below the name band: the head frame, head and tail, or
@@ -991,8 +991,8 @@ fn draw_clip(
     // 1 pt black separator at the clip's left edge
     p.line_segment([pos2(body.min.x + 0.5, body.min.y), pos2(body.min.x + 0.5, body.max.y)], Stroke::new(1.0, Color32::BLACK));
     if selected {
-        p.rect_stroke(body.shrink(1.0), 0.0, Stroke::new(1.0, Color32::BLACK), StrokeKind::Inside);
-        p.rect_stroke(body, 0.0, Stroke::new(2.0, t.clip_selected_border), StrokeKind::Inside);
+        p.rect_stroke(body.shrink(1.0), t.radius_sm, Stroke::new(1.0, Color32::from_black_alpha(120)), StrokeKind::Inside);
+        p.rect_stroke(body, t.radius_sm, Stroke::new(2.0, t.clip_selected_border), StrokeKind::Inside);
     }
 }
 
@@ -1241,20 +1241,20 @@ fn draw_transition(p: &egui::Painter, r: Rect, trn: &filmcraft_project::Transiti
     }
 }
 
-/// A Premiere track-header button (patch / target): highlight-blue fill when on, full track height.
+/// A track-header button (patch / target): highlight fill when on, full track height.
 fn patch_button(ui: &mut egui::Ui, r: Rect, clip: Rect, label: &str, on: bool, show_off: bool, id: egui::Id, t: &Tokens) -> egui::Response {
     let resp = ui.interact(r.intersect(clip), id, Sense::click());
     let p = ui.painter().with_clip_rect(clip);
     if on {
-        p.rect_filled(r, 2.0, t.track_target);
-        p.text(r.center(), Align2::CENTER_CENTER, label, Tokens::semibold(10.0), Color32::from_rgb(0xeb, 0xeb, 0xeb));
+        p.rect_filled(r, t.radius_sm, t.track_target);
+        p.text(r.center(), Align2::CENTER_CENTER, label, Tokens::semibold(10.5), Color32::from_rgb(0xf8, 0xfa, 0xfc));
     } else if show_off {
         if resp.hovered() {
-            p.rect_filled(r, 2.0, t.hover);
+            p.rect_filled(r, t.radius_sm, t.hover);
         }
-        p.text(r.center(), Align2::CENTER_CENTER, label, Tokens::semibold(10.0), t.text_dim);
+        p.text(r.center(), Align2::CENTER_CENTER, label, Tokens::semibold(10.5), t.text_dim);
     } else if resp.hovered() {
-        p.rect_stroke(r, 2.0, Stroke::new(1.0, t.separator), StrokeKind::Inside);
+        p.rect_stroke(r, t.radius_sm, Stroke::new(1.0, t.separator), StrokeKind::Inside);
     }
     resp
 }
@@ -1543,11 +1543,11 @@ fn draw_top(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect, seq: &Sequenc
         let resp = ui.interact(r, egui::Id::new(("tl-toggle", key)), Sense::click()).on_hover_text(tip);
         app.auto.add(&format!("timeline.toggle.{key}"), r, tip);
         if toggle && on {
-            p.rect_filled(r, 4.0, t.pressed);
+            p.rect_filled(r, t.radius_sm, t.accent);
         } else if resp.hovered() {
-            p.rect_filled(r, 4.0, t.hover);
+            p.rect_filled(r, t.radius_sm, t.hover);
         }
-        icons::paint(&p, r.shrink(7.0), icon, if toggle && on { t.text } else { t.text_dim });
+        icons::paint(&p, r.shrink(7.0), icon, if toggle && on { Color32::WHITE } else { t.text_dim });
         if resp.clicked() {
             let _ = match key {
                 "nest" => app.session.execute("sequence.nestSequences", json!({})),

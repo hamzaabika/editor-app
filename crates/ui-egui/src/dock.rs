@@ -753,6 +753,12 @@ pub fn draw_group_chrome_details(ui: &mut egui::Ui, g: &Group, seqs: &SeqTabs, t
             if tab.seq.is_none() || is_active {
                 reg.add_response(&format!("panel.tab.{}", p.id()), &resp, p.title());
             }
+            let is_active = tab.active;
+            if is_active {
+                painter.rect_filled(tab_rect.shrink2(vec2(2.0, 4.0)), 6.0, t.hover);
+            } else if resp.hovered() {
+                painter.rect_filled(tab_rect.shrink2(vec2(2.0, 5.0)), 6.0, t.field_bg);
+            }
             let label_x = tab_rect.min.x + 8.0 + close_w;
             let label_w = galley.size().x;
             let col = if is_active || resp.hovered() { t.tab_text_active } else { t.tab_text };
@@ -778,11 +784,11 @@ pub fn draw_group_chrome_details(ui: &mut egui::Ui, g: &Group, seqs: &SeqTabs, t
                 let mresp = ui.interact(mr.expand(3.0), egui::Id::new(("tab-menu", g.path.clone())), Sense::click());
                 mresp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, mresp.enabled(), "panel menu"));
                 reg.add_response(&format!("panel.menu.{}", p.id()), &mresp, "panel menu");
-                let mc = if mresp.hovered() { t.tab_text_active } else { t.tab_text };
-                icons::paint(&painter, Rect::from_center_size(mr.center(), vec2(16.0, 16.0)), Icon::Hamburger, mc);
-                // 1 pt underline spanning label + ≡, 23 pt below the frame top
-                let uy = strip.min.y + 23.0;
-                painter.line_segment([pos2(label_x, uy), pos2(mr.max.x, uy)], Stroke::new(1.0, t.tab_text_active));
+                let mc = if mresp.hovered() { t.tab_text_active } else { t.text_dim };
+                icons::paint(&painter, Rect::from_center_size(mr.center(), vec2(14.0, 14.0)), Icon::Hamburger, mc);
+                // Modern active tab indicator pill (2.5pt electric violet, rounded)
+                let uy = strip.min.y + t.tab_h - 2.5;
+                painter.line_segment([pos2(tab_rect.min.x + 6.0, uy), pos2(tab_rect.max.x - 6.0, uy)], Stroke::new(2.5, t.focus));
                 paint_widget_focus(&painter, &mresp, t);
                 if mresp.clicked() {
                     actions.push(DockAction::PanelMenu(*p, mr.left_bottom()));
@@ -879,7 +885,9 @@ pub fn draw_group_chrome_details(ui: &mut egui::Ui, g: &Group, seqs: &SeqTabs, t
 /// Paint once after the group's contents so child backgrounds cannot hide its focus (#1075).
 pub(crate) fn paint_group_focus(ui: &egui::Ui, group: &Group, focused: PanelKind, tokens: &Tokens) {
     if group.panels.get(group.active).copied() == Some(focused) {
-        ui.painter().rect_stroke(group.rect, 0.0, Stroke::new(1.0, tokens.focus), StrokeKind::Inside);
+        ui.painter().rect_stroke(group.rect, tokens.radius, Stroke::new(1.5, tokens.focus), StrokeKind::Inside);
+    } else {
+        ui.painter().rect_stroke(group.rect, tokens.radius, Stroke::new(1.0, tokens.separator), StrokeKind::Inside);
     }
 }
 
